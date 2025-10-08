@@ -6,76 +6,66 @@ const jwt = require('jsonwebtoken');
 
 // --- Centralized Configuration ---
 const { connect } = require("./lib/db");
-const User = require('./models/User'); // Ensure User model is loaded
+const User = require('./models/User');
+const { requireAuth } = require('./lib/auth'); // <-- Import auth middleware
 
 // Connect to the database immediately
 connect();
 
 const app = express();
 
-// --- Robust Middleware Setup ---
-// This handles the browser's pre-flight requests and is more reliable.
+// --- Middleware Setup ---
 app.use(cors({ origin: '*' }));
 app.use(express.static('public'));
 app.use(express.json());
 
 
-// --- Direct API Route Handling ---
+// --- AUTHENTICATION ROUTES (Public) ---
 
-// 1. REGISTRATION LOGIC
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) {
-      return res.status(400).send('Email and password are required');
-    }
-    console.log(`Registration attempt for: ${email}`);
+    if (!email || !password) return res.status(400).send('Email and password are required');
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({ email, passwordHash });
     const token = jwt.sign({ uid: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    console.log(`Registration successful for: ${email}`);
     res.json({ token, user: { id: user._id, email: user.email } });
   } catch (error) {
-    console.error(`Registration Error for ${req.body.email}:`, error.message);
-    // 11000 is the error code for a duplicate key (i.e., email already exists)
-    if (error.code === 11000) {
-        return res.status(409).send('This email address is already registered.');
-    }
-    res.status(500).send('An internal server error occurred during registration.');
+    if (error.code === 11000) return res.status(409).send('This email address is already registered.');
+    res.status(500).send('An internal server error occurred.');
   }
 });
 
-// 2. LOGIN LOGIC
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).send('Email and password are required.');
-    }
-    console.log(`Login attempt for email: [${email}]`);
+    if (!email || !password) return res.status(400).send('Email and password are required.');
     const user = await User.findOne({ email });
-    if (!user) {
-      console.log(`Login failed: User not found for email [${email}]`);
-      return res.status(401).send('Authentication failed.');
-    }
+    if (!user) return res.status(401).send('Authentication failed.');
     const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) {
-      console.log(`Login failed: Password does not match for user [${email}]`);
-      return res.status(401).send('Authentication failed.');
-    }
-    console.log(`Login successful for user [${email}]`);
+    if (!isMatch) return res.status(401).send('Authentication failed.');
     const token = jwt.sign({ uid: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user._id, email: user.email } });
   } catch (err) {
-    console.error('FATAL LOGIN ERROR:', err);
     res.status(500).send('An internal server error occurred.');
   }
 });
 
 
+// --- APPLICATION ROUTES (Protected) ---
+// We use a router to apply the requireAuth middleware to all /api/app routes
+const appRouter = express.Router();
+appRouter.use(requireAuth); // Protect all routes in this router
+
+// Now, define the routes on the router
+appRouter.get('/thread', require('./api/app/thread'));
+appRouter.get('/message', require('./api/app/message'));
+appRouter.post('/send', require('./api/app/send'));
+appRouter.post('/link', require('./api/app/link'));
+
+// Mount the protected router
+app.use('/api/app', appRouter);
+
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-
-// Start other providers if needed
-require("./lib/providers/discord");
-require("./lib/providers/telegram");
