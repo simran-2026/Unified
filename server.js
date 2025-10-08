@@ -1,6 +1,6 @@
 // server.js
 const express = require("express");
-const cors = require("cors"); // <-- 1. IMPORT CORS
+const cors = require("cors");
 const { connect } = require("./lib/db");
 
 // connect to Mongo first
@@ -8,8 +8,12 @@ connect();
 
 const app = express();
 
-// --- 2. ADD MIDDLEWARE ---
-app.use(cors()); // <-- Add this line to enable CORS
+// --- More Explicit CORS Configuration ---
+// This allows requests from any origin.
+app.use(cors({
+  origin: '*'
+}));
+
 app.use(express.json());
 app.use(express.static('public'));
 
