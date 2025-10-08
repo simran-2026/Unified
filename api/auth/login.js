@@ -9,35 +9,38 @@ module.exports = async (req, res) => {
       return res.status(405).send('Method Not Allowed');
     }
 
-    // Check if the request body is present
     if (!req.body) {
-      console.error("Login Error: Request body is missing. Ensure express.json() middleware is used.");
+      console.error("Login Error: Request body is missing.");
       return res.status(400).send('Bad Request: Missing login credentials.');
     }
     
     const { email, password } = req.body;
 
     if (!email || !password) {
+      console.log(`Login attempt failed: Email or password was not provided. Email: [${email}]`);
       return res.status(400).send('Email and password are required.');
     }
 
     await connect();
+    console.log(`Login attempt for email: [${email}]`);
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).send('Authentication failed: User not found.');
+      console.log(`Login failed: User not found for email [${email}]`);
+      return res.status(401).send('Authentication failed: User not found or incorrect password.');
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
-      return res.status(400).send('Authentication failed: Incorrect password.');
+      console.log(`Login failed: Password does not match for user [${email}]`);
+      return res.status(401).send('Authentication failed: User not found or incorrect password.');
     }
 
-    // If everything is correct, send the token
+    // If everything is correct, log success and send the token
+    console.log(`Login successful for user [${email}]`);
     res.json({ token: sign(user), user: { id: user._id, email: user.email } });
 
   } catch (err) {
-    // Log any unexpected errors and send a generic error response
     console.error('FATAL LOGIN ERROR:', err);
     res.status(500).send('An internal server error occurred.');
   }
