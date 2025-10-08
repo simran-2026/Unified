@@ -8,7 +8,11 @@ connect();
 const app = express();
 app.use(express.json());
 
-// load your routes - Corrected Paths
+// --- ADD THIS LINE ---
+// This tells Express to serve files from the 'public' folder
+app.use(express.static('public'));
+
+// load your routes
 app.use("/api", require("./api/app/message"));
 app.use("/api", require("./api/app/send"));
 app.use("/api", require("./api/app/thread"));
