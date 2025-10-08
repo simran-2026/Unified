@@ -22,6 +22,8 @@
         .message { margin-bottom: 15px; }
         .message .sender { font-weight: bold; }
         .message .text { margin-top: 5px; }
+        .threads-header { display: flex; justify-content: space-between; align-items: center; padding: 0 15px; }
+        #refresh-button { padding: 8px 12px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -37,7 +39,10 @@
 
     <div id="app-container" style="display: none;">
         <div id="threads-panel">
-            <h2 style="padding-left: 15px;">Inbox</h2>
+            <div class="threads-header">
+                <h2>Inbox</h2>
+                <button id="refresh-button">Refresh</button>
+            </div>
             <div id="threads-list"></div>
         </div>
         <div id="messages-panel">
@@ -60,6 +65,7 @@
         const messagesList = document.getElementById('messages-list');
         const messageForm = document.getElementById('message-form');
         const messageInput = document.getElementById('message-input');
+        const refreshButton = document.getElementById('refresh-button'); // <-- Get the refresh button
         
         // App State
         let authToken = null;
@@ -68,6 +74,7 @@
         // Event Listeners
         loginForm.addEventListener('submit', handleLogin);
         messageForm.addEventListener('submit', handleSendMessage);
+        refreshButton.addEventListener('click', fetchThreads); // <-- Add click listener
 
         // Functions
         async function handleLogin(e) {
@@ -84,10 +91,6 @@
             if (response.ok) {
                 const { token } = await response.json();
                 authToken = token;
-                
-                // DEBUG: Alert to confirm token is received
-                alert('Login successful! Token: ' + authToken);
-
                 loginView.style.display = 'none';
                 appContainer.style.display = 'flex';
                 fetchThreads();
@@ -97,10 +100,10 @@
         }
 
         async function fetchThreads() {
-            if (!authToken) {
-                alert('Cannot fetch threads, no auth token!');
-                return;
-            }
+            if (!authToken) return;
+
+            console.log("Fetching threads..."); // Log for debugging
+            threadsList.innerHTML = '<p style="padding: 15px;">Loading...</p>'; // Show loading indicator
 
             const response = await fetch('/api/app/thread', {
                 headers: { 'Authorization': `Bearer ${authToken}` }
@@ -108,7 +111,10 @@
 
             if (response.ok) {
                 const threads = await response.json();
-                threadsList.innerHTML = '';
+                threadsList.innerHTML = ''; // Clear loading indicator
+                if (threads.length === 0) {
+                    threadsList.innerHTML = '<p style="padding: 15px;">No conversations yet.</p>';
+                }
                 threads.forEach(thread => {
                     const threadDiv = document.createElement('div');
                     threadDiv.className = 'thread-item';
@@ -128,9 +134,7 @@
                     threadsList.appendChild(threadDiv);
                 });
             } else {
-                // If fetching threads fails, show the error from the server
-                const errorText = await response.text();
-                alert('Failed to fetch threads: ' + errorText);
+                alert('Failed to fetch threads.');
             }
         }
 
@@ -138,7 +142,7 @@
             if (!authToken || !threadId) return;
 
             messagesList.innerHTML = '<p>Loading messages...</p>';
-            messageForm.style.display = 'flex'; // Show the message form
+            messageForm.style.display = 'flex';
 
             const response = await fetch(`/api/app/message?id=${threadId}`, {
                 headers: { 'Authorization': `Bearer ${authToken}` }
@@ -157,16 +161,15 @@
             const text = messageInput.value.trim();
             if (!text || !currentThreadId) return;
 
-            // Optimistic UI Update
             const optimisticMessage = {
                 senderName: 'You',
                 text: text,
                 sentAt: new Date().toISOString()
             };
-            renderMessages([optimisticMessage], true); // Add to existing messages
+            renderMessages([optimisticMessage], true);
             messageInput.value = '';
 
-            const response = await fetch('/api/app/send', {
+            await fetch('/api/app/send', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -174,12 +177,6 @@
                 },
                 body: JSON.stringify({ threadId: currentThreadId, text })
             });
-
-            if (!response.ok) {
-                alert('Message failed to send!');
-                // Here you could add logic to remove the optimistic message
-                // or mark it as failed.
-            }
         }
 
         function renderMessages(messages, append = false) {
@@ -196,7 +193,7 @@
                 `;
                 messagesList.appendChild(messageDiv);
             });
-            messagesList.scrollTop = messagesList.scrollHeight; // Scroll to bottom
+            messagesList.scrollTop = messagesList.scrollHeight;
         }
 
     </script>
