@@ -1,15 +1,16 @@
 // server.js
 const express = require("express");
+const cors = require("cors"); // <-- 1. IMPORT CORS
 const { connect } = require("./lib/db");
 
 // connect to Mongo first
 connect();
 
 const app = express();
-app.use(express.json());
 
-// --- ADD THIS LINE ---
-// This tells Express to serve files from the 'public' folder
+// --- 2. ADD MIDDLEWARE ---
+app.use(cors()); // <-- Add this line to enable CORS
+app.use(express.json());
 app.use(express.static('public'));
 
 // load your routes
