@@ -84,6 +84,10 @@
             if (response.ok) {
                 const { token } = await response.json();
                 authToken = token;
+                
+                // DEBUG: Alert to confirm token is received
+                alert('Login successful! Token: ' + authToken);
+
                 loginView.style.display = 'none';
                 appContainer.style.display = 'flex';
                 fetchThreads();
@@ -93,7 +97,10 @@
         }
 
         async function fetchThreads() {
-            if (!authToken) return;
+            if (!authToken) {
+                alert('Cannot fetch threads, no auth token!');
+                return;
+            }
 
             const response = await fetch('/api/app/thread', {
                 headers: { 'Authorization': `Bearer ${authToken}` }
@@ -120,6 +127,10 @@
                     });
                     threadsList.appendChild(threadDiv);
                 });
+            } else {
+                // If fetching threads fails, show the error from the server
+                const errorText = await response.text();
+                alert('Failed to fetch threads: ' + errorText);
             }
         }
 
@@ -169,8 +180,6 @@
                 // Here you could add logic to remove the optimistic message
                 // or mark it as failed.
             }
-            // If successful, the next time fetchMessages is called, the real message
-            // from the database will be displayed.
         }
 
         function renderMessages(messages, append = false) {
